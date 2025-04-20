@@ -1,0 +1,29 @@
+# Установка базовых пакетов на всех хостах
+- name: Install curl, wget, gnupg, sudo, iptables
+  ansible.builtin.apt:
+    name:
+      - curl
+      - wget
+      - gnupg
+      - sudo
+      - iptables
+    state: present
+    update_cache: yes
+
+# Установка tmux только на main_control_panel
+- name: Install tmux (only on main_control_panel)
+  ansible.builtin.apt:
+    name: tmux
+    state: present
+    update_cache: yes
+  when: "'main_control_panel' in group_names"
+
+# Установка keepalived и haproxy только на control_panel
+- name: Install keepalived and haproxy (only on control_panel)
+  ansible.builtin.apt:
+    name:
+      - keepalived
+      - haproxy
+    state: present
+    update_cache: yes
+  when: "'control_panel' in group_names"
