@@ -34,3 +34,13 @@
     - name: Install dependencies
       ansible.builtin.import_tasks: install_dependencies.yml
       tags: notest
+
+- name: Configure Kubernetes prerequisites
+  hosts: all
+  gather_facts: false
+  become: true
+  become_method: sudo
+  tasks:
+    - name: Apply Kubernetes prerequisites
+      ansible.builtin.import_tasks: k8s_prereqs.yml
+      
