@@ -13,7 +13,7 @@
   tasks:
     - name: Включить сетевые задачи
       ansible.builtin.import_tasks: network_tasks.yml
-      tags: test
+      tags: untest
 
 - name: Add Debian 12 (bookworm) repositories
   hosts: all
@@ -23,7 +23,7 @@
   tasks:
     - name: Add repositories
       ansible.builtin.import_tasks: add_repositories.yml
-      tags: test 
+      tags: untest 
 
 - name: Install dependencies
   hosts: all:control_panel
@@ -33,7 +33,7 @@
   tasks:
     - name: Install dependencies
       ansible.builtin.import_tasks: install_dependencies.yml
-      tags: test
+      tags: untest
 
 - name: Configure Kubernetes prerequisites
   hosts: all
@@ -43,7 +43,7 @@
   tasks:
     - name: Apply Kubernetes prerequisites
       ansible.builtin.import_tasks: k8s_prereqs.yml
-      tags: test
+      tags: untest
 
 - name: Установка движков для Kuber
 # cri-o -> 0
@@ -59,23 +59,23 @@
     - name: cri-o
       ansible.builtin.import_tasks: cri-o.yml
       when: branch_mode == 0
-      tags: test
+      tags: untest
 
     - name: containerd
       ansible.builtin.import_tasks: containerd.yml
       when: branch_mode == 1
-      tags: test
+      tags: untest
 
     - name: cri-dockerd
       ansible.builtin.import_tasks: cri-dockerd.yml
       when: branch_mode == 2      
-      tags: test
+      tags: untest
 
 - name: Развёртывание Kubernetes
 # cri-o -> 0
 # containerd -> 1
 # Docker + cri-dockerd -> 2
-  hosts: all
+  hosts: control_panel:workers
   gather_facts: false  
   become: true
   become_method: sudo
@@ -84,8 +84,10 @@
   tasks:
     - name: all in one
       ansible.builtin.import_tasks: all_in_one.yml
-      when: branch_mode == 0 or branch_mode == 1
+      when: branch_mode == 0 or branch_mode == 1   
+      tags: test
 
     - name: ha cluster
-      ansible.builtin.import_tasks: cri-dockerd.yml
-      when: branch_mode == 2
+      ansible.builtin.import_tasks: cluster.yml
+      when: branch_mode == 2   
+      tags: test
