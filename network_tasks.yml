@@ -1,0 +1,47 @@
+# Сетевые задачи для настройки интерфейса, hostname, resolv.conf и hosts
+
+- name: Настройка статических IP адресов узлов кластера
+  ansible.builtin.lineinfile:
+    path: /etc/network/interfaces
+    line: "{{ item }}"
+    create: yes
+    insertafter: EOF
+  with_items:
+    - "auto lo"
+    - "iface lo inet loopback"
+    - "auto ens33"
+    - "iface ens33 inet static"
+    - "address 172.30.0.20{{ inventory_hostname | regex_replace('^node', '') }}"
+    - "netmask 255.255.255.0"
+    - "gateway 172.30.0.2"
+
+- name: Установка hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}.internal"
+
+- name: Добавить строку nameserver в /etc/resolv.conf
+  ansible.builtin.lineinfile:
+    path: /etc/resolv.conf
+    line: "nameserver 172.30.0.2"
+    create: yes
+
+- name: Обновить /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    create: yes
+    line: "{{ item }}"
+    insertafter: EOF
+  with_items:
+    - "127.0.0.1       localhost"
+    - "# The following lines are desirable for IPv6 capable hosts"
+    - "::1     localhost ip6-localhost ip6-loopback"
+    - "ff02::1 ip6-allnodes"
+    - "ff02::2 ip6-allrouters"
+
+- name: Добавить строки для всех nodeX.internal в /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    create: yes
+    line: "172.30.0.20{{ item }} node{{ item }}.internal"
+    insertafter: EOF
+  loop: "{{ query('inventory_hostnames', 'all') | select('match', '^node[0-9]+$') | map('regex_replace', '^node', '') | list }}"
