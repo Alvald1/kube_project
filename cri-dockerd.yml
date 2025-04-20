@@ -1,0 +1,76 @@
+---
+- name: Ensure /etc/apt/keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Add Docker GPG key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+
+- name: Add Docker repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ ansible_architecture | default('amd64') }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ ansible_lsb.codename | default('bookworm') }} stable"
+    filename: docker
+    state: present
+    update_cache: yes
+
+- name: Install Docker and related packages
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+
+- name: Download cri-dockerd deb package
+  ansible.builtin.get_url:
+    url: https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.16/cri-dockerd_0.3.16.3-0.debian-bookworm_amd64.deb
+    dest: /tmp/cri-dockerd_0.3.16.3-0.debian-bookworm_amd64.deb
+
+- name: Install cri-dockerd deb package
+  ansible.builtin.apt:
+    deb: /tmp/cri-dockerd_0.3.16.3-0.debian-bookworm_amd64.deb
+
+- name: Remove cri-dockerd deb package
+  ansible.builtin.file:
+    path: /tmp/cri-dockerd_0.3.16.3-0.debian-bookworm_amd64.deb
+    state: absent
+
+- name: Ensure cri-docker.service.d directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/cri-docker.service.d
+    state: directory
+    mode: '0755'
+
+- name: Configure pause image for cri-dockerd
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/cri-docker.service.d/10-pause.conf
+    content: |
+      # File: /etc/systemd/system/cri-docker.service.d/10-pause.conf
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/cri-dockerd --container-runtime-endpoint fd:// --pod-infra-container-image "registry.k8s.io/pause:3.10"
+    mode: '0644'
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: Restart cri-docker service
+  ansible.builtin.systemd:
+    name: cri-docker.service
+    state: restarted
+
+- name: Configure crictl to use cri-dockerd
+  ansible.builtin.copy:
+    dest: /etc/crictl.yaml
+    content: |
+      runtime-endpoint: unix:///var/run/cri-dockerd.sock
+    mode: '0644'
