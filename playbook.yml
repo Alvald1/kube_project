@@ -1,10 +1,33 @@
 - name: Test connectivity with ping
-  hosts: node2
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ping all hosts
+      ansible.builtin.ping:
+
+- name: Run network tasks
+  hosts: all
   gather_facts: false
   become: true
   become_method: sudo
   tasks:
-    - name: Ping all hosts
-      ansible.builtin.ping:
     - name: Включить сетевые задачи
       ansible.builtin.import_tasks: network_tasks.yml
+
+- name: Add Debian 12 (bookworm) repositories
+  hosts: all
+  gather_facts: false
+  become: true
+  become_method: sudo
+  tasks:
+    - name: Add repositories
+      ansible.builtin.import_tasks: add_repositories.yml
+
+- name: Install dependencies
+  hosts: all:main_control_panel:control_panel
+  gather_facts: false
+  become: true
+  become_method: sudo
+  tasks:
+    - name: Install dependencies
+      ansible.builtin.import_tasks: install_dependencies.yml
