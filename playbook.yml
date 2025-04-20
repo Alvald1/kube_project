@@ -13,7 +13,7 @@
   tasks:
     - name: Включить сетевые задачи
       ansible.builtin.import_tasks: network_tasks.yml
-      tags: untest
+      tags: test
 
 - name: Add Debian 12 (bookworm) repositories
   hosts: all
@@ -23,7 +23,7 @@
   tasks:
     - name: Add repositories
       ansible.builtin.import_tasks: add_repositories.yml
-      tags: untest 
+      tags: test 
 
 - name: Install dependencies
   hosts: all:control_panel
@@ -33,7 +33,7 @@
   tasks:
     - name: Install dependencies
       ansible.builtin.import_tasks: install_dependencies.yml
-      tags: untest
+      tags: test
 
 - name: Configure Kubernetes prerequisites
   hosts: all
@@ -43,7 +43,7 @@
   tasks:
     - name: Apply Kubernetes prerequisites
       ansible.builtin.import_tasks: k8s_prereqs.yml
-      tags: untest
+      tags: test
 
 - name: Установка движков для Kuber
 # cri-o -> 0
@@ -59,17 +59,17 @@
     - name: cri-o
       ansible.builtin.import_tasks: cri-o.yml
       when: branch_mode == 0
-      tags: untest
+      tags: test
 
     - name: containerd
       ansible.builtin.import_tasks: containerd.yml
       when: branch_mode == 1
-      tags: untest
+      tags: test
 
     - name: cri-dockerd
       ansible.builtin.import_tasks: cri-dockerd.yml
       when: branch_mode == 2      
-      tags: untest
+      tags: test
 
 - name: Развёртывание Kubernetes
 # cri-o -> 0
@@ -84,10 +84,28 @@
   tasks:
     - name: all in one
       ansible.builtin.import_tasks: all_in_one.yml
-      when: branch_mode == 0 or branch_mode == 1   
+      when: 
+        - branch_mode == 0 or branch_mode == 1   
+        - inventory_hostname == 'node1'
       tags: test
 
-    - name: ha cluster
+    - name: ha cluster 
       ansible.builtin.import_tasks: cluster.yml
       when: branch_mode == 2   
       tags: test
+
+- name: Deploy nginx manifest on node1
+  hosts: node1
+  gather_facts: false
+  become: true
+  become_method: sudo
+  tasks:
+    - name: Copy nginx.yml to node1
+      ansible.builtin.copy:
+        src: nginx.yml
+        dest: ~/nginx.yml
+
+    - name: Apply nginx manifest
+      ansible.builtin.command: kubectl apply -f /home/user/nginx.yml --kubeconfig=/home/user/.kube/config
+
+
