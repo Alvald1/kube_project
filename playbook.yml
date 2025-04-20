@@ -6,7 +6,7 @@
       ansible.builtin.ping:
 
 - name: Run network tasks
-  hosts: all
+  hosts: node1
   gather_facts: false
   become: true
   become_method: sudo
@@ -16,7 +16,7 @@
       tags: notest
 
 - name: Add Debian 12 (bookworm) repositories
-  hosts: all
+  hosts: node1
   gather_facts: false
   become: true
   become_method: sudo
@@ -26,7 +26,7 @@
       tags: notest 
 
 - name: Install dependencies
-  hosts: all:main_control_panel:control_panel
+  hosts: node1
   gather_facts: false
   become: true
   become_method: sudo
@@ -36,7 +36,7 @@
       tags: notest
 
 - name: Configure Kubernetes prerequisites
-  hosts: all
+  hosts: node1
   gather_facts: false
   become: true
   become_method: sudo
@@ -44,4 +44,26 @@
     - name: Apply Kubernetes prerequisites
       ansible.builtin.import_tasks: k8s_prereqs.yml
       tags: notest
-      
+
+- name: Движки для Kuber
+# cri-o -> 0
+# containerd -> 1
+# Docker + cri-dockerd -> 2
+  hosts: node1
+  gather_facts: false  
+  become: true
+  become_method: sudo
+  vars_files:
+    - branch_var.yml
+  tasks:
+    - name: cri-o
+      ansible.builtin.import_tasks: cri-o.yml
+      when: branch_mode == 0
+
+    - name: containerd
+      ansible.builtin.import_tasks: containerd.yml
+      when: branch_mode == 1
+
+    - name: cri-dockerd
+      ansible.builtin.import_tasks: cri-dockerd.yml
+      when: branch_mode == 2

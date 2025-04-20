@@ -10,14 +10,6 @@
     state: present
     update_cache: yes
 
-# Установка tmux только на main_control_panel
-- name: Install tmux (only on main_control_panel)
-  ansible.builtin.apt:
-    name: tmux
-    state: present
-    update_cache: yes
-  when: "'main_control_panel' in group_names"
-
 # Установка keepalived и haproxy только на control_panel
 - name: Install keepalived and haproxy (only on control_panel)
   ansible.builtin.apt:
