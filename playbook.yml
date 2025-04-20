@@ -1,5 +1,5 @@
 - name: Test connectivity with ping
-  hosts: node2
+  hosts: node1
   gather_facts: false
   become: true
   become_method: sudo
@@ -20,3 +20,18 @@
         - "address 172.30.0.20{{ inventory_hostname | regex_replace('^node', '') }}"
         - "netmask 255.255.255.0"
         - "gateway 172.30.0.2"
+    - name: Установка hostname
+      ansible.builtin.command:
+        cmd: "hostnamectl set-hostname {{ inventory_hostname }}.internal"
+    - name: Очистить /etc/resolv.conf
+      ansible.builtin.copy:
+        dest: /etc/resolv.conf
+        content: ""
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Добавить строку nameserver в /etc/resolv.conf
+      ansible.builtin.lineinfile:
+        path: /etc/resolv.conf
+        line: "nameserver 172.30.0.2"
+        create: yes
