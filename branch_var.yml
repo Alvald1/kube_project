@@ -1,4 +1,4 @@
 # cri-o -> 0
 # containerd -> 1
 # Docker + cri-dockerd -> 2
-branch_mode: 2
+branch_mode: 0

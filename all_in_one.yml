@@ -1,0 +1,55 @@
+- name: Initialize Kubernetes cluster
+  become: yes
+  ansible.builtin.command: kubeadm init --pod-network-cidr=10.244.0.0/16
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+
+
+- name: Ensure .kube directory exists
+  become: yes
+  ansible.builtin.file:
+    path: /home/{{ ansible_user | default('user') }}/.kube
+    state: directory
+    owner: "{{ ansible_user | default('user') }}"
+    group: "{{ ansible_user | default('user') }}"
+    mode: '0700'
+
+- name: Copy kubeconfig to user home
+  become: yes
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/{{ ansible_user | default('user') }}/.kube/config
+    owner: "{{ ansible_user | default('user') }}"
+    group: "{{ ansible_user | default('user') }}"
+    mode: '0600'
+    remote_src: yes
+
+- name: Set KUBECONFIG in /etc/environment
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/environment
+    line: KUBECONFIG=/home/{{ ansible_user | default('user') }}/.kube/config
+    create: yes
+
+- name: Export KUBECONFIG for current session
+  ansible.builtin.shell: export KUBECONFIG=/home/{{ ansible_user | default('user') }}/.kube/config
+  environment:
+    KUBECONFIG: /home/{{ ansible_user | default('user') }}/.kube/config
+  changed_when: false
+
+- name: Apply Flannel CNI plugin (only on node1)
+  become: yes
+  ansible.builtin.command: kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: inventory_hostname == 'node1'
+
+- name: Remove control-plane taint to allow workloads on master
+  become: yes
+  ansible.builtin.command: kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: inventory_hostname == 'node1'
+  ignore_errors: yes
+

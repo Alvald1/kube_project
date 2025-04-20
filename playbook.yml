@@ -6,50 +6,50 @@
       ansible.builtin.ping:
 
 - name: Run network tasks
-  hosts: node1
+  hosts: all
   gather_facts: false
   become: true
   become_method: sudo
   tasks:
     - name: Включить сетевые задачи
       ansible.builtin.import_tasks: network_tasks.yml
-      tags: notest
+      tags: test
 
 - name: Add Debian 12 (bookworm) repositories
-  hosts: node1
+  hosts: all
   gather_facts: false
   become: true
   become_method: sudo
   tasks:
     - name: Add repositories
       ansible.builtin.import_tasks: add_repositories.yml
-      tags: notest 
+      tags: test 
 
 - name: Install dependencies
-  hosts: node1
+  hosts: all:control_panel
   gather_facts: false
   become: true
   become_method: sudo
   tasks:
     - name: Install dependencies
       ansible.builtin.import_tasks: install_dependencies.yml
-      tags: notest
+      tags: test
 
 - name: Configure Kubernetes prerequisites
-  hosts: node1
+  hosts: all
   gather_facts: false
   become: true
   become_method: sudo
   tasks:
     - name: Apply Kubernetes prerequisites
       ansible.builtin.import_tasks: k8s_prereqs.yml
-      tags: notest
+      tags: test
 
-- name: Движки для Kuber
+- name: Установка движков для Kuber
 # cri-o -> 0
 # containerd -> 1
 # Docker + cri-dockerd -> 2
-  hosts: node1
+  hosts: all
   gather_facts: false  
   become: true
   become_method: sudo
@@ -59,11 +59,33 @@
     - name: cri-o
       ansible.builtin.import_tasks: cri-o.yml
       when: branch_mode == 0
+      tags: test
 
     - name: containerd
       ansible.builtin.import_tasks: containerd.yml
       when: branch_mode == 1
+      tags: test
 
     - name: cri-dockerd
+      ansible.builtin.import_tasks: cri-dockerd.yml
+      when: branch_mode == 2      
+      tags: test
+
+- name: Развёртывание Kubernetes
+# cri-o -> 0
+# containerd -> 1
+# Docker + cri-dockerd -> 2
+  hosts: all
+  gather_facts: false  
+  become: true
+  become_method: sudo
+  vars_files:
+    - branch_var.yml
+  tasks:
+    - name: all in one
+      ansible.builtin.import_tasks: all_in_one.yml
+      when: branch_mode == 0 or branch_mode == 1
+
+    - name: ha cluster
       ansible.builtin.import_tasks: cri-dockerd.yml
       when: branch_mode == 2
