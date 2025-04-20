@@ -1,6 +1,22 @@
 - name: Test connectivity with ping
-  hosts: all
+  hosts: node2
   gather_facts: false
+  become: true
+  become_method: sudo
   tasks:
     - name: Ping all hosts
       ansible.builtin.ping:
+    - name: Настройка статических IP адресов узлов кластера
+      ansible.builtin.lineinfile:
+        path: /etc/network/interfaces
+        line: "{{ item }}"
+        create: yes
+        insertafter: EOF
+      with_items:
+        - "auto lo"
+        - "iface lo inet loopback"
+        - "auto ens33"
+        - "iface ens33 inet static"
+        - "address 172.30.0.20{{ inventory_hostname | regex_replace('^node', '') }}"
+        - "netmask 255.255.255.0"
+        - "gateway 172.30.0.2"
