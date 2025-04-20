@@ -13,6 +13,7 @@
   tasks:
     - name: Включить сетевые задачи
       ansible.builtin.import_tasks: network_tasks.yml
+      tags: notest
 
 - name: Add Debian 12 (bookworm) repositories
   hosts: all
@@ -22,6 +23,7 @@
   tasks:
     - name: Add repositories
       ansible.builtin.import_tasks: add_repositories.yml
+      tags: notest
 
 - name: Install dependencies
   hosts: all:main_control_panel:control_panel
@@ -31,3 +33,4 @@
   tasks:
     - name: Install dependencies
       ansible.builtin.import_tasks: install_dependencies.yml
+      tags: notest
