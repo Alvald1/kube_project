@@ -103,7 +103,7 @@
     - name: Copy nginx.yml to node1
       ansible.builtin.copy:
         src: nginx.yml
-        dest: ~/nginx.yml
+        dest: /home/user/nginx.yml
 
     - name: Apply nginx manifest
       ansible.builtin.command: kubectl apply -f /home/user/nginx.yml --kubeconfig=/home/user/.kube/config
