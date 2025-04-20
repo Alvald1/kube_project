@@ -23,7 +23,7 @@
   tasks:
     - name: Add repositories
       ansible.builtin.import_tasks: add_repositories.yml
-      tags: notest
+      tags: notest 
 
 - name: Install dependencies
   hosts: all:main_control_panel:control_panel
@@ -43,4 +43,5 @@
   tasks:
     - name: Apply Kubernetes prerequisites
       ansible.builtin.import_tasks: k8s_prereqs.yml
+      tags: notest
       
