@@ -40,3 +40,35 @@
     path: /etc/fstab
     regexp: '^([^#].*\s+swap\s+)'
     replace: '#\1'
+
+- name: Ensure /etc/apt/keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Add Kubernetes apt keyring 
+  ansible.builtin.apt_key:
+    url: https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key
+    keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    state: present
+
+- name: Add Kubernetes apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /"
+    filename: kubernetes
+    state: present
+    mode: '0644'
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Install kubeadm, kubectl, and kubelet
+  ansible.builtin.apt:
+    name:
+      - kubeadm
+      - kubectl
+      - kubelet
+    state: present
+    update_cache: no
