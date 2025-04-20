@@ -149,3 +149,124 @@
     name: haproxy
     state: restarted
   when: "'control_panel' in group_names"
+
+- name: Initialize Kubernetes control plane on node1 and save output
+  ansible.builtin.command: |
+    kubeadm init \
+      --cri-socket unix:///var/run/cri-dockerd.sock \
+      --pod-network-cidr=10.244.0.0/16 \
+      --control-plane-endpoint "192.168.62.200:8888" \
+      --upload-certs
+  args:
+    creates: /etc/kubernetes/admin.conf  
+  when: inventory_hostname == 'node1'
+
+- name: Upload certs and get certificate key (on node1)
+  ansible.builtin.command: kubeadm init phase upload-certs --upload-certs
+  register: upload_certs_result
+  when: inventory_hostname == 'node1'
+  run_once: true
+
+- name: Extract certificate key from upload-certs output (on node1)
+  ansible.builtin.set_fact:
+    kubeadm_certificate_key: "{{ upload_certs_result.stdout | regex_findall('([a-f0-9]{64})') | first }}"
+  when: inventory_hostname == 'node1'
+  run_once: true
+
+- name: Generate kubeadm join command for control-plane (on node1)
+  ansible.builtin.command: kubeadm token create --print-join-command
+  register: kubeadm_join_cmd_result
+  when: inventory_hostname == 'node1'
+  run_once: true
+
+- name: Compose full workers join command (on node1)
+  ansible.builtin.set_fact:
+    kubeadm_join_command_workers: '{{ kubeadm_join_cmd_result.stdout }}'
+  when: inventory_hostname == 'node1'
+  run_once: true
+
+- name: Compose full control-plane join command (on node1)
+  ansible.builtin.set_fact:
+    kubeadm_join_command_control: "{{ kubeadm_join_command_workers }} --control-plane --certificate-key {{ kubeadm_certificate_key }}"
+  when: inventory_hostname == 'node1'
+  run_once: true
+
+- name: Set join command fact on all hosts
+  ansible.builtin.set_fact:
+    kubeadm_join_command_control: "{{ hostvars['node1']['kubeadm_join_command_control'] }}"
+  when: inventory_hostname != 'node1'
+
+- name: Set join command fact on all hosts
+  ansible.builtin.set_fact:
+    kubeadm_join_command_workers: "{{ hostvars['node1']['kubeadm_join_command_workers'] }}"
+  when: inventory_hostname != 'node1'
+
+- name: Join control-plane nodes to the Kubernetes cluster
+  ansible.builtin.shell: "{{ kubeadm_join_command_control }} --cri-socket unix:///var/run/cri-dockerd.sock --ignore-preflight-errors=all"
+  args:
+    creates: /etc/kubernetes/admin.conf
+  when:
+    - "'control_panel' in group_names"
+    - inventory_hostname != 'node1'
+
+- name: Check if worker node already joined the cluster
+  ansible.builtin.command: kubectl get node {{ inventory_hostname }}.internal -o name --kubeconfig /etc/kubernetes/admin.conf
+  register: kube_worker_exists
+  delegate_to: node1
+  ignore_errors: yes
+  changed_when: false
+  failed_when: false
+  when:
+    - "'workers' in group_names"
+
+- name: Join workers nodes to the Kubernetes cluster
+  ansible.builtin.shell: "{{ kubeadm_join_command_workers }} --cri-socket unix:///var/run/cri-dockerd.sock --ignore-preflight-errors=all"
+  args:
+    creates: /etc/kubernetes/admin.conf
+  when:
+    - "'workers' in group_names"
+    - kube_worker_exists is defined
+    - kube_worker_exists.rc != 0
+
+- name: Ensure .kube directory exists
+  become: yes
+  ansible.builtin.file:
+    path: /home/{{ ansible_user | default('user') }}/.kube
+    state: directory
+    owner: "{{ ansible_user | default('user') }}"
+    group: "{{ ansible_user | default('user') }}"
+    mode: '0700'
+  when: "'control_panel' in group_names"
+
+- name: Copy kubeconfig to user home
+  become: yes
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/{{ ansible_user | default('user') }}/.kube/config
+    owner: "{{ ansible_user | default('user') }}"
+    group: "{{ ansible_user | default('user') }}"
+    mode: '0600'
+    remote_src: yes
+  when: "'control_panel' in group_names"
+
+- name: Set KUBECONFIG in /etc/environment
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/environment
+    line: KUBECONFIG=/home/{{ ansible_user | default('user') }}/.kube/config
+    create: yes
+  when: "'control_panel' in group_names"
+
+- name: Export KUBECONFIG for current session
+  ansible.builtin.shell: export KUBECONFIG=/home/{{ ansible_user | default('user') }}/.kube/config
+  environment:
+    KUBECONFIG: /home/{{ ansible_user | default('user') }}/.kube/config
+  changed_when: false
+  when: "'control_panel' in group_names"
+
+- name: Apply Flannel CNI plugin (only on node1)
+  become: yes
+  ansible.builtin.command: kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: inventory_hostname == 'node1'
