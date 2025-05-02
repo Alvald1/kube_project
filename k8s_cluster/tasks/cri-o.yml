@@ -4,10 +4,6 @@
     state: present
     update_cache: yes
 
-- name: Set CRI-O version
-  set_fact:
-    crio_version: "v1.32"
-
 - name: Ensure /etc/apt/keyrings directory exists
   file:
     path: /etc/apt/keyrings
@@ -16,7 +12,7 @@
 
 - name: Download CRI-O GPG key
   get_url:
-    url: "https://download.opensuse.org/repositories/isv:/cri-o:/stable:/{{ crio_version }}/deb/Release.key"
+    url: "{{ cri-o-gpg-key }}"
     dest: /usr/share/keyrings/cri-o-keyring.gpg_armored
 
 - name: De-Armor CRI-O GPG key
@@ -26,7 +22,7 @@
 
 - name: Add CRI-O repository
   ansible.builtin.apt_repository:
-    repo: "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://download.opensuse.org/repositories/isv:/cri-o:/stable:/{{ crio_version }}/deb/ /"
+    repo: "{{ cri-o-apt-repo }}"
     state: present
     filename: cri-o
 

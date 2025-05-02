@@ -1,17 +1,17 @@
 - name: Download containerd archive
   get_url:
-    url: https://github.com/containerd/containerd/releases/download/v2.0.4/containerd-2.0.4-linux-amd64.tar.gz
-    dest: /tmp/containerd-2.0.4-linux-amd64.tar.gz
+    url: "{{ containerd-archive }}"
+    dest: /tmp/containerd-{{ containerd_version }}-linux-amd64.tar.gz
 
 - name: Extract containerd archive
   unarchive:
-    src: /tmp/containerd-2.0.4-linux-amd64.tar.gz
+    src: /tmp/containerd-{{ containerd_version }}-linux-amd64.tar.gz
     dest: /usr/local
     remote_src: yes
 
 - name: Remove containerd archive
   file:
-    path: /tmp/containerd-2.0.4-linux-amd64.tar.gz
+    path: /tmp/containerd-{{ containerd_version }}-linux-amd64.tar.gz
     state: absent
 
 - name: Create /etc/containerd directory
@@ -33,12 +33,12 @@
 
 - name: Download containerd systemd service file
   get_url:
-    url: https://raw.githubusercontent.com/containerd/containerd/main/containerd.service
+    url: "{{ containerd-service }}"
     dest: /etc/systemd/system/containerd.service
 
 - name: Download runc binary
   get_url:
-    url: https://github.com/opencontainers/runc/releases/download/v1.2.6/runc.amd64
+    url: "{{ runc-binary }}"
     dest: /tmp/runc.amd64
     mode: '0755'
 
@@ -56,8 +56,8 @@
 
 - name: Download CNI plugins
   get_url:
-    url: https://github.com/containernetworking/plugins/releases/download/v1.6.2/cni-plugins-linux-amd64-v1.6.2.tgz
-    dest: /tmp/cni-plugins-linux-amd64-v1.6.2.tgz
+    url: "{{ CNI-plugins }}"
+    dest: /tmp/cni-plugins-linux-amd64-{{ CNI_version }}.tgz
 
 - name: Create CNI bin directory
   file:
@@ -67,13 +67,13 @@
 
 - name: Extract CNI plugins
   unarchive:
-    src: /tmp/cni-plugins-linux-amd64-v1.6.2.tgz
+    src: /tmp/cni-plugins-linux-amd64-{{ CNI_version }}.tgz
     dest: /opt/cni/bin
     remote_src: yes
 
 - name: Remove CNI plugins archive
   file:
-    path: /tmp/cni-plugins-linux-amd64-v1.6.2.tgz
+    path: /tmp/cni-plugins-linux-amd64-{{ CNI_version }}.tgz
     state: absent
 
 - name: Reload systemd daemon

@@ -24,7 +24,7 @@
               auth_pass ZqSj#f1G
           }
           virtual_ipaddress {
-              192.168.62.200
+              {{ network_prefix }}{{ ip_base_virtual }}
           }
           track_script {
               check_apiserver
@@ -42,8 +42,8 @@
       #!/bin/sh
       # File: /etc/keepalived/check_apiserver.sh
 
-      APISERVER_VIP=192.168.62.200
-      APISERVER_DEST_PORT=8888
+      APISERVER_VIP={{ network_prefix }}{{ ip_base_virtual }}
+      APISERVER_DEST_PORT={{ api_port }}
       PROTO=http
 
       errorExit() {
@@ -65,6 +65,21 @@
     path: /etc/keepalived/check_apiserver.sh
     mode: '0755'
   when: "'control_panel' in group_names"
+
+- name: Get ingress-nginx NodePort for HTTP
+  ansible.builtin.command: |
+    kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath="{.spec.ports[?(@.port==80)].nodePort}"
+  environment:
+    KUBECONFIG: "{{ kube-pwd }}/config"
+  register: ingress_nodeport_result
+  delegate_to: node1
+  run_once: true
+  changed_when: false
+
+- name: Set ingress NodePort fact
+  set_fact:
+    ingress_nodeport: "{{ ingress_nodeport_result.stdout }}"
+  when: ingress_nodeport_result.stdout is defined
 
 - name: Create haproxy.cfg on control_panel nodes
   ansible.builtin.copy:
@@ -104,7 +119,7 @@
       # apiserver frontend which proxys to the control plane nodes
       #---------------------------------------------------------------------
       frontend apiserver
-          bind *:8888
+          bind *:{{ api_port }}
           mode tcp
           option tcplog
           default_backend apiserver
@@ -118,9 +133,26 @@
           mode tcp
           option ssl-hello-chk
           balance     roundrobin
-              server node1 192.168.62.133:6443 check
-              server node2 192.168.62.134:6443 check
-              server node3 192.168.62.135:6443 check
+          {% for idx, host in groups['control_panel'] | enumerate(start=1) %}
+              server {{ host }} {{ network_prefix }}{{ ip_base + idx }}:{{ control_panel_port }} check
+          {% endfor %}
+
+      #---------------------------------------------------------------------
+      # frontend for ingress controller (apps)
+      #---------------------------------------------------------------------
+      frontend ingress-http
+          bind *:80
+          mode tcp
+          option tcplog
+          default_backend ingress-http
+
+      backend ingress-http
+          mode tcp
+          balance roundrobin
+          {% for idx, host in groups['workers'] | enumerate(start=groups['control_panel']|length + 1) %}
+              server {{ host }} {{ network_prefix }}{{ ip_base + idx }}:{{ ingress_nodeport }} check
+          {% endfor %}
+
     owner: root
     group: root
     mode: '0644'
@@ -154,8 +186,8 @@
   ansible.builtin.command: |
     kubeadm init \
       --cri-socket unix:///var/run/cri-dockerd.sock \
-      --pod-network-cidr=10.244.0.0/16 \
-      --control-plane-endpoint "192.168.62.200:8888" \
+      --pod-network-cidr={{ pod_network }} \
+      --control-plane-endpoint "{{ network_prefix }}{{ ip_base_virtual }}:{{ api_port }}" \
       --upload-certs
   args:
     creates: /etc/kubernetes/admin.conf  
@@ -202,7 +234,7 @@
   when: inventory_hostname != 'node1'
 
 - name: Join control-plane nodes to the Kubernetes cluster
-  ansible.builtin.shell: "{{ kubeadm_join_command_control }} --cri-socket unix:///var/run/cri-dockerd.sock --ignore-preflight-errors=all"
+  ansible.builtin.command: "{{ kubeadm_join_command_control }} --cri-socket unix:///var/run/cri-dockerd.sock --ignore-preflight-errors=all"
   args:
     creates: /etc/kubernetes/admin.conf
   when:
@@ -210,17 +242,19 @@
     - inventory_hostname != 'node1'
 
 - name: Check if worker node already joined the cluster
-  ansible.builtin.command: kubectl get node {{ inventory_hostname }}.internal -o name --kubeconfig /etc/kubernetes/admin.conf
+  ansible.builtin.command: kubectl get node {{ inventory_hostname }}.internal -o name
   register: kube_worker_exists
   delegate_to: node1
   ignore_errors: yes
   changed_when: false
   failed_when: false
+  environment:
+    KUBECONFIG: "{{ kube-pwd }}/config"
   when:
     - "'workers' in group_names"
 
 - name: Join workers nodes to the Kubernetes cluster
-  ansible.builtin.shell: "{{ kubeadm_join_command_workers }} --cri-socket unix:///var/run/cri-dockerd.sock --ignore-preflight-errors=all"
+  ansible.builtin.command: "{{ kubeadm_join_command_workers }} --cri-socket unix:///var/run/cri-dockerd.sock --ignore-preflight-errors=all"
   args:
     creates: /etc/kubernetes/admin.conf
   when:
@@ -231,7 +265,7 @@
 - name: Ensure .kube directory exists
   become: yes
   ansible.builtin.file:
-    path: /home/{{ ansible_user | default('user') }}/.kube
+    path: "{{ kube-pwd }}"
     state: directory
     owner: "{{ ansible_user | default('user') }}"
     group: "{{ ansible_user | default('user') }}"
@@ -242,31 +276,16 @@
   become: yes
   ansible.builtin.copy:
     src: /etc/kubernetes/admin.conf
-    dest: /home/{{ ansible_user | default('user') }}/.kube/config
+    dest: "{{ kube-pwd }}/config"
     owner: "{{ ansible_user | default('user') }}"
     group: "{{ ansible_user | default('user') }}"
     mode: '0600'
     remote_src: yes
   when: "'control_panel' in group_names"
 
-- name: Set KUBECONFIG in /etc/environment
-  become: yes
-  ansible.builtin.lineinfile:
-    path: /etc/environment
-    line: KUBECONFIG=/home/{{ ansible_user | default('user') }}/.kube/config
-    create: yes
-  when: "'control_panel' in group_names"
-
-- name: Export KUBECONFIG for current session
-  ansible.builtin.shell: export KUBECONFIG=/home/{{ ansible_user | default('user') }}/.kube/config
-  environment:
-    KUBECONFIG: /home/{{ ansible_user | default('user') }}/.kube/config
-  changed_when: false
-  when: "'control_panel' in group_names"
-
 - name: Apply Flannel CNI plugin (only on node1)
   become: yes
   ansible.builtin.command: kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
   environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
+    KUBECONFIG: "{{ kube-pwd }}/config"
   when: inventory_hostname == 'node1'

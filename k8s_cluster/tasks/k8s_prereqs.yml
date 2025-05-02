@@ -3,17 +3,13 @@
     path: /etc/modules-load.d/k8s.conf
     line: "{{ item }}"
     create: true
-  loop:
-    - overlay
-    - br_netfilter
+  loop: "{{ kernel-modules }}"
 
 - name: Load required kernel modules
   ansible.builtin.modprobe:
     name: "{{ item }}"
     state: present
-  loop:
-    - overlay
-    - br_netfilter
+  loop: "{{ kernel-modules }}"
 
 - name: Apply sysctl params
   ansible.builtin.sysctl:
@@ -22,10 +18,7 @@
     sysctl_set: yes
     state: present
     reload: yes
-  loop:
-    - { key: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
-    - { key: "net.bridge.bridge-nf-call-iptables", value: "1" }
-    - { key: "net.ipv4.ip_forward", value: "1" }
+  loop: "{{ sysctl-params }}"
 
 - name: Set swappiness to 0 (disable swap via sysctl)
   ansible.builtin.sysctl:
@@ -49,13 +42,13 @@
 
 - name: Add Kubernetes apt keyring 
   ansible.builtin.apt_key:
-    url: https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key
+    url: "{{ k8s-apt-key }}"
     keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
     state: present
 
 - name: Add Kubernetes apt repository
   ansible.builtin.apt_repository:
-    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /"
+    repo: "{{ k8s-apt-repo }}"
     filename: kubernetes
     state: present
     mode: '0644'
@@ -66,9 +59,6 @@
 
 - name: Install kubeadm, kubectl, and kubelet
   ansible.builtin.apt:
-    name:
-      - kubeadm
-      - kubectl
-      - kubelet
+    name: "{{ kube-packages }}"
     state: present
     update_cache: no

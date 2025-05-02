@@ -8,6 +8,6 @@
   ansible.builtin.lineinfile:
     path: /etc/hosts
     create: yes
-    line: "{{ '192.168.62.' ~ (132 + (item | int)) ~ ' node' ~ item ~ '.internal' }}"
+    line: "{{ network_prefix ~ (ip_base + (item | int)) ~ ' node' ~ item ~ '.internal' }}"
     insertafter: EOF
   loop: "{{ query('inventory_hostnames', 'all') | select('match', '^node[0-9]+$') | map('regex_replace', '^node', '') | list }}"
