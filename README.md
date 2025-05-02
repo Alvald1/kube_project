@@ -32,6 +32,14 @@
    ```
 4. После завершения деплоя, nginx будет доступен на NodePort 30080 на node1.
 
+## k8s_cluster_role
+
+Роль можно установить с помощью `ansible-galaxy`
+```bash
+ansible-galaxy role install Alvald1.k8s_cluster_role
+```
+Репозиторий с ролью [k8s_cluster_role](https://github.com/Alvald1/k8s_cluster_role)
+
 ## Примечания
 
 - Для HA-кластера используйте `branch_mode: 2` (Docker+cri-dockerd).
