@@ -3,6 +3,5 @@
   become: true
   vars_files:
     - vault.yml
-    - branch_var.yml
   roles:
     - k8s_cluster

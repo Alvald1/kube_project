@@ -6,18 +6,18 @@
 
 - name: Add main contrib non-free non-free-firmware repo
   ansible.builtin.apt_repository:
-    repo: "{{ debian-main-repo }}"
+    repo: "{{ debian_main_repo }}"
     state: present
     filename: 'debian-main'
 
 - name: Add updates repo
   ansible.builtin.apt_repository:
-    repo: "{{ debian-updates-repo }}"
+    repo: "{{ debian_updates_repo }}"
     state: present
     filename: 'debian-updates'
 
 - name: Add security repo
   ansible.builtin.apt_repository:
-    repo: "{{ debian-security-repo }}"
+    repo: "{{ debian_security_repo }}"
     state: present
     filename: 'debian-security'

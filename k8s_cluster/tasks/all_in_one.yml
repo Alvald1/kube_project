@@ -8,7 +8,7 @@
 - name: Ensure .kube directory exists
   become: yes
   ansible.builtin.file:
-    path: "{{ kube-pwd }}"
+    path: "{{ kube_pwd }}"
     state: directory
     owner: "{{ ansible_user | default('user') }}"
     group: "{{ ansible_user | default('user') }}"
@@ -19,7 +19,7 @@
   become: yes
   ansible.builtin.copy:
     src: /etc/kubernetes/admin.conf
-    dest: "{{ kube-pwd }}/config"
+    dest: "{{ kube_pwd }}/config"
     owner: "{{ ansible_user | default('user') }}"
     group: "{{ ansible_user | default('user') }}"
     mode: '0600'
@@ -28,16 +28,16 @@
 
 - name: Apply Flannel CNI plugin (only on node1)
   become: yes
-  ansible.builtin.command: kubectl apply -f {{ kube-flannel }}
+  ansible.builtin.command: kubectl apply -f {{ kube_flannel }}
   environment:
-    KUBECONFIG: "{{ kube-pwd }}/config"
+    KUBECONFIG: "{{ kube_pwd }}/config"
   when: inventory_hostname == 'node1'
 
 - name: Remove control-plane taint to allow workloads on master
   become: yes
   ansible.builtin.command: kubectl taint nodes --all node-role.kubernetes.io/control-plane-
   environment:
-    KUBECONFIG: "{{ kube-pwd }}/config"
+    KUBECONFIG: "{{ kube_pwd }}/config"
   when: inventory_hostname == 'node1'
   ignore_errors: yes
 

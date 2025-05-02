@@ -28,6 +28,10 @@
     - (branch_mode == 0 or branch_mode == 1)
     - inventory_hostname == 'node1'
 
+- name: Deploy HA ingress controller if branch_mode == 2
+  import_tasks: ingress_controller.yml
+  when: branch_mode == 2
+
 - name: Deploy HA cluster if branch_mode == 2
   import_tasks: cluster.yml
   when: branch_mode == 2

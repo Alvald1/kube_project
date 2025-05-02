@@ -6,26 +6,26 @@
 
 - name: Add Docker GPG key
   ansible.builtin.get_url:
-    url: "{{ docker-gpg-key }}"
+    url: "{{ docker_gpg_key }}"
     dest: /etc/apt/keyrings/docker.asc
     mode: '0644'
 
 - name: Add Docker repository
   ansible.builtin.apt_repository:
-    repo: "{{ docker-apt-repo }}"
+    repo: "{{ docker_apt_repo }}"
     filename: docker
     state: present
     update_cache: yes
 
 - name: Install Docker and related packages
   ansible.builtin.apt:
-    name: "{{ docker-packages }}"
+    name: "{{ docker_packages }}"
     state: present
     update_cache: yes
 
-- name: Download cri-dockerd deb package
+- name: Download cri_dockerd deb package
   ansible.builtin.get_url:
-    url: 
+    url: "{{ cri_docker_package }}"
     dest: /tmp/cri-dockerd_{{ cri_docker_version }}.3-0.debian-bookworm_amd64.deb
 
 - name: Install cri-dockerd deb package

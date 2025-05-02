@@ -12,7 +12,7 @@
 
 - name: Download CRI-O GPG key
   get_url:
-    url: "{{ cri-o-gpg-key }}"
+    url: "{{ cri_o_gpg_key }}"
     dest: /usr/share/keyrings/cri-o-keyring.gpg_armored
 
 - name: De-Armor CRI-O GPG key
@@ -22,7 +22,7 @@
 
 - name: Add CRI-O repository
   ansible.builtin.apt_repository:
-    repo: "{{ cri-o-apt-repo }}"
+    repo: "{{ cri_o_apt_repo }}"
     state: present
     filename: cri-o
 
