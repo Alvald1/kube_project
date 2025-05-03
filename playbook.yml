@@ -19,10 +19,35 @@
     - name: Set system time to match control host
       ansible.builtin.command: date -s "{{ hostvars['localhost']['synced_time'] }}"
       
+- name: Find reachable control-panel node
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Check which control-panel nodes are reachable
+      ansible.builtin.ping:
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['control_panel'] }}"
+      register: ping_results
+      ignore_unreachable: yes
+
+    - name: Set active_control_panel to first reachable node
+      set_fact:
+        active_control_panel: "{{ ping_results.results | selectattr('unreachable', 'undefined') | selectattr('failed', 'defined') | selectattr('failed', 'equalto', false) | map(attribute='item') | list | first }}"
+
+    - name: Save active_control_panel to file
+      copy:
+        dest: /tmp/active_control_panel.json
+        content: "{{ {'active_control_panel': active_control_panel} | to_nice_json }}"
+
+
 - name: Deploy Kubernetes cluster
   hosts: all
   become: true
   vars_files:
     - vault.yml
+  pre_tasks:
+    - name: Load active_control_panel from file
+      include_vars:
+        file: /tmp/active_control_panel.json
   roles:
     - k8s_cluster
